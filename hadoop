@@ -1,0 +1,34 @@
+//Import all tables from mysql database into hdfs as avro data files. 
+use compression and the compression codec should be snappy. data warehouse directory should be retail_stage.db
+
+sqoop import-all-tables \
+-Dmapreduce.job.user.classpath.first=true \
+--connect jdbc:mysql://ms.itversity.com/retail_db" \
+--username retail_user \
+--password itversity \
+--compress \
+--compression-codec Snappy \
+--warehouse-dir /user/sumitsinha1680/hive/warehouse/retail_stage.db \
+--as-avrodatafile \
+-m 1;
+
+//in case hadoop not able to read avrodata file.Please use below code
+-Dmapreduce.job.user.classpath.first=true \
+
+//Create a metastore table that should point to the orders data imported by sqoop job above. Name the table orders_sqoop
+hadoop fs -get /user/hive/warehouse/retail_stage1.db/orders/part-m-00000.avro
+avro-tools getschema part-m-00000.avro > orders.avsc
+hadoop fs -mkdir /user/hive/schemas
+hadoop fs -ls /user/hive/schemas/order
+hadoop fs -copyFromLocal orders.avsc /user/hive/schemas/order
+
+Launch HIVE using 'hive' command in a separate terminal
+
+Below HIVE command will create a table pointing to the avro data file for orders data
+
+create external table orders_sqoop
+STORED AS AVRO
+LOCATION '/user/hive/warehouse/retail_stage.db/orders'
+TBLPROPERTIES ('avro.schema.url'='/user/hive/schemas/order/orders.avsc')
+
+
