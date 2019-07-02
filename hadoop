@@ -8,7 +8,7 @@ sqoop import-all-tables \
 --password itversity \
 --compress \
 --compression-codec Snappy \
---warehouse-dir /user/sumitsinha1680/hive/warehouse/retail_stage.db \
+--warehouse-dir /user/sumitsinha1680/hive/warehouse/retail_stage4.db \
 --as-avrodatafile \
 -m 1;
 
@@ -16,19 +16,74 @@ sqoop import-all-tables \
 -Dmapreduce.job.user.classpath.first=true \
 
 //Create a metastore table that should point to the orders data imported by sqoop job above. Name the table orders_sqoop
-hadoop fs -get /user/hive/warehouse/retail_stage1.db/orders/part-m-00000.avro
+mkdir avro-test
+cd avro-test
+hadoop fs -get /user/hive/warehouse/retail_stage4.db/orders/part-m-00000.avro
 avro-tools getschema part-m-00000.avro > orders.avsc
-hadoop fs -mkdir /user/hive/schemas
-hadoop fs -ls /user/hive/schemas/order
+
+//Now we need to load the avsc file to hdfc
+hadoop fs -mkdir /user/sumitsinha1680/hive/schemas
+hadoop fs -mkdir /user/sumitsinha1680/hive/schemas/order
 hadoop fs -copyFromLocal orders.avsc /user/hive/schemas/order
 
 Launch HIVE using 'hive' command in a separate terminal
 
 Below HIVE command will create a table pointing to the avro data file for orders data
 
-create external table orders_sqoop
+create external table orders2_sqoop
 STORED AS AVRO
-LOCATION '/user/hive/warehouse/retail_stage.db/orders'
-TBLPROPERTIES ('avro.schema.url'='/user/hive/schemas/order/orders.avsc')
+LOCATION '/user/sumitsinha1680/hive/warehouse/retail_stage4.db/orders'
+TBLPROPERTIES ('avro.schema.url'='/user/sumitsinha1680/hive/schemas/order/orders.avsc')
+
+q3 - //Write query in hive that shows all orders belonging to a certain day. 
+This day is when the most orders were placed. select data from orders2_sqoop.
+
+//first find the total orders for a given date in descending order
+Run ih hive
+
+select y.order_date,count(1) as total_orders from orders2_sqoop as y group by
+y.order_date order by total_orders desc limit 1;
+
+//we get order date and highest orders and i need date only
+select z.order_date from (select y.order_date,count(1) as total_orders from orders2_sqoop as y group by
+y.order_date order by total_orders desc limit 1) as z;
+
+//extract all the columns
+select * from orders2_sqoop as x where x.order_date in (select z.order_date from (select y.order_date,count(1) as total_orders from orders2_sqoop as y 
+group by y.order_date order by total_orders desc limit 1) as z);
+
+//04-query table in impala that shows all orders belonging to a certain day. 
+This day is when the most orders were placed. select data from order_sqoop. 
+
+Lanch Impala shell by using command impala-shell
+
+1. Run 'Invalidate metadata'
+2. Run below query
+
+
+select * from orders_sqoop as X where X.order_date in (select a.order_date from (select Y.order_date, count(1) as total_orders from orders_sqoop as Y group by Y.order_date order by total_orders desc, Y.order_date desc limit 1) a);
+
+//Now create a table named retail.orders_avro in hive stored as avro, the table should have same table definition as order_sqoop. 
+Additionally, this new table should be partitioned by the order month i.e -> year-order_month.(example: 2014-01)
+
+//enable dynamic partition
+set hive.exec.dynamic.partition = true;
+set hive.exec.dynamic.partition.mode = nonstrict;
+
+insert overwrite table orders_avro partition (order_month)
+select order_id, to_date(from_unixtime(cast(order_date/1000 as int))), 
+order_customer_id, order_status, 
+substr(from_unixtime(cast(order_date/1000 as int)),1,7) as order_month from default.orders2_sqoop;
+
+
+
+
+
+
+
+
+
+
+
 
 
