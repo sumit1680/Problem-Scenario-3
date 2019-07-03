@@ -75,7 +75,82 @@ select order_id, to_date(from_unixtime(cast(order_date/1000 as int))),
 order_customer_id, order_status, 
 substr(from_unixtime(cast(order_date/1000 as int)),1,7) as order_month from default.orders2_sqoop;
 
+//Write query in hive that shows all orders belonging to a certain day. 
+This day is when the most orders were placed. select data from orders_avro
 
+select * from orders_avro as X where X.order_date in (select a.order_date from (select Y.order_date, count(1) as total_orders from orders_avro 
+as Y group by Y.order_date order by total_orders desc, Y.order_date desc limit 1) a);
+
+//evolve the avro schema related to orders_sqoop table by adding more fields named (order_style String, order_zone Integer)
+insert two more records into orders_sqoop table
+
+1. hadoop fs -get /user/hive/schemas/order/orders.avsc
+2. gedit orders.avsc
+
+3.{
+  "type" : "record",
+  "name" : "orders",
+  "doc" : "Sqoop import of orders",
+  "fields" : [ {
+    "name" : "order_id",
+    "type" : [ "null", "int" ],
+    "default" : null,
+    "columnName" : "order_id",
+    "sqlType" : "4"
+  }, {
+    "name" : "order_date",
+    "type" : [ "null", "long" ],
+    "default" : null,
+    "columnName" : "order_date",
+    "sqlType" : "93"
+  }, {
+    "name" : "order_customer_id",
+    "type" : [ "null", "int" ],
+    "default" : null,
+    "columnName" : "order_customer_id",
+    "sqlType" : "4"
+  },{
+    "name" : "order_style",
+    "type" : [ "null", "string" ],
+    "default" : null,
+    "columnName" : "order_style",
+    "sqlType" : "12"
+  }, {
+    "name" : "order_zone",
+    "type" : [ "null", "int" ],
+    "default" : null,
+    "columnName" : "order_zone",
+    "sqlType" : "4"
+  }, {
+    "name" : "order_status",
+    "type" : [ "null", "string" ],
+    "default" : null,
+    "columnName" : "order_status",
+    "sqlType" : "12"
+  } ],
+  "tableName" : "orders"
+}
+
+4. hadoop fs -copyFromLocal -f orders.avsc /user/hive/schemas/order/orders.avsc
+
+Step 9 - Insert 2 records from Hive shell
+insert into table orders_sqoop values (8888888,1374735600000,11567,"xyz",9,"CLOSED");
+insert into table orders_sqoop values (8888889,1374735600000,11567,"xyz",9,"CLOSED");
+Step 10 -Run the query in Hive: 
+Run this query in Hive. 
+
+select * from orders_sqoop as X where X.order_date in (select inner.order_date from (select Y.order_date, count(1) as total_orders from orders_sqoop as Y group by Y.order_date order by total_orders desc, Y.order_date desc limit 1) inner);
+
+
+
+Step 11-Run the query Impala: 
+Lanch Impala shell by using command impala-shell
+
+1. Run 'Invalidate metadata'
+2. Run below query
+
+
+select * from orders_sqoop as X where X.order_date in (select a.order_date from (select Y.order_date, count(1) as total_orders from orders_sqoop as Y group by Y.order_date order by total_orders desc, Y.order_date desc limit 1) a);
 
 
 
